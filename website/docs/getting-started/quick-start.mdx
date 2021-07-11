@@ -2,18 +2,20 @@
 sidebar_position: 10
 ---
 
+import clsx from "clsx";
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
+import styles from './getting-started.module.scss';
 
 # Quick Start
 
-Using Dockerized Build Environment to start quickly
+Using Dockerized Build Environment (DBE) to start quickly
 
 There are more than one way to start using the Urho3D library. This section shows you how to start quickly by using docker containers that have the build environment already prepared for you. All you need is a working docker engine on your host system.
 
 :::tip
 
-Skip to the Requirements section, if you cannot use docker engine on your host system.
+Skip to the [Installation](installation) section, if you cannot use docker engine on your host system.
 
 :::
 
@@ -29,15 +31,17 @@ Windows host system requires WSL2.
 
 :::
 
-## Build and Install Urho3D Library
+## Install Urho3D Library with DBE
 
-Clone the Urho3D project from the main branch, change directory to its project root, and execute the following commands to build and install the library for your desired target platform.
+Clone the Urho3D project from the main branch, change directory to its project root, and execute the following commands to install the library for your desired target platform. Except for Android platform, which uses `~/.m2/repository/`, the default install location is: <code>~/.urho3d/install/<em>&lt;platform&gt;</em>/</code>. The "~" here refers to home directory mounted from a docker volume and as such it is persistent in between docker runs.
 
 <Tabs
+  className={styles.dbeInstall}
   groupId={'target-platform'}
   defaultValue={'android'}
   values={[
     {label: 'Android', value: 'android'},
+    {label: 'Apple', value: 'apple'},
     {label: 'Arm', value: 'arm'},
     {label: 'Linux', value: 'linux'},
     {label: 'RPI', value: 'rpi'},
@@ -45,89 +49,87 @@ Clone the Urho3D project from the main branch, change directory to its project r
     {label: 'Windows', value: 'win'},
   ]
   }>
-  <TabItem value="android">
+  <TabItem value={'android'}>
 
 ```bash
 git clone https://github.com/urho3d/Urho3D.git
 cd Urho3D
-# Build Urho3D library
-script/dockerized.sh android
-# Install Urho3D library to Maven local repository mounted from a docker volume
-script/dockerized.sh android rake install
+# Install Urho3D library to Maven local repository
+script/dockerized.sh android rake build install
 ```
 
   </TabItem>
-  <TabItem value="arm">
-
-```bash {3}
-git clone https://github.com/urho3d/Urho3D.git
-cd Urho3D
-# Build Urho3D library, usually you need to specify extra build options to target a specific ARM board
-script/dockerized.sh arm
-# Install Urho3D library to a stage directory mounted from a docker volume
-script/dockerized.sh arm rake install[~/stage-arm]
-```
-
+  <TabItem value={'apple'}>
+    <div className={clsx('textBlock', styles.fixedHeight)}>
+      Currently DBE does not support Apple platforms.<br/>
+      However, Urho3D supports Apple platforms using native build environment.
+    </div>
   </TabItem>
-  <TabItem value="linux">
+  <TabItem value={'arm'}>
 
 ```bash
 git clone https://github.com/urho3d/Urho3D.git
 cd Urho3D
-# Build Urho3D library
-script/dockerized.sh linux
-# Install Urho3D library to a stage directory mounted from a docker volume
-script/dockerized.sh linux rake install[~/stage-linux]
+# Install Urho3D library to a default install location, substitute '?' accordingly
+ARM_ABI_FLAGS=? script/dockerized.sh arm rake build install
 ```
 
   </TabItem>
-  <TabItem value="rpi">
-
-```bash {3}
-git clone https://github.com/urho3d/Urho3D.git
-cd Urho3D
-# Build Urho3D library, modify the "RPI_ABI" build option accordingly
-RPI_ABI=RPI4 script/dockerized.sh rpi
-# Install Urho3D library to a stage directory mounted from a docker volume
-script/dockerized.sh rpi rake install[~/stage-rpi]
-```
-
-  </TabItem>
-  <TabItem value="web">
+  <TabItem value={'linux'}>
 
 ```bash
 git clone https://github.com/urho3d/Urho3D.git
 cd Urho3D
-# Build Urho3D library
-script/dockerized.sh web
-# Install Urho3D library to a stage directory mounted from a docker volume
-script/dockerized.sh web rake install[~/stage-web]
+# Install Urho3D library to a default install location
+script/dockerized.sh linux rake build install
 ```
 
   </TabItem>
-  <TabItem value="win">
+  <TabItem value={'rpi'}>
 
 ```bash
 git clone https://github.com/urho3d/Urho3D.git
 cd Urho3D
-# Build Urho3D library
-script/dockerized.sh mingw
-# Install Urho3D library to a stage directory mounted from a docker volume
-script/dockerized.sh mingw rake install[~/stage-mingw]
+# Install Urho3D library to a default install location, modify the "RPI_ABI" build option accordingly
+RPI_ABI=RPI4 script/dockerized.sh rpi rake build install
+```
+
+  </TabItem>
+  <TabItem value={'web'}>
+
+```bash
+git clone https://github.com/urho3d/Urho3D.git
+cd Urho3D
+# Install Urho3D library to a default install location
+script/dockerized.sh web rake build install
+```
+
+  </TabItem>
+  <TabItem value={'win'}>
+
+```bash
+git clone https://github.com/urho3d/Urho3D.git
+cd Urho3D
+# Install Urho3D library to a default install location
+script/dockerized.sh mingw rake build install
 ```
 
   </TabItem>
 </Tabs>
 
-## Create a New UrhoApp
+The `script/dockerized.sh` spawns one of the docker container based on the specified platform name in the first argument. The rest of the arguments specify the command to be executed inside the container. The default command is `rake build`. You can invoke other rake tasks by passing the command explicitly as arguments. It is also possible to invoke multiple rake tasks in one go. Read Rake Tasks section for more details.
 
-You need an installed Urho3D library for the desired target platform to proceed. Although the Urho3D build system also supports linking the Urho3D library directly from its build tree, this quick start guide will not be discussing it here. Assuming you have been following along from the previous section, execute the following commands to create a new skeleton project structure for your new app, and then build it.
+## Create a New UrhoApp with DBE
+
+You need an installed Urho3D library for the desired target platform to proceed. Although the Urho3D build system also supports linking the Urho3D library directly from its build tree, this quick start section will not be discussing it here. Assuming you have been following along from the previous section, execute the following commands to create a new UrhoApp project, and then build it.
 
 <Tabs
+  className={styles.dbeBuildUrhoApp}
   groupId={'target-platform'}
   defaultValue={'android'}
   values={[
     {label: 'Android', value: 'android'},
+    {label: 'Apple', value: 'apple'},
     {label: 'Arm', value: 'arm'},
     {label: 'Linux', value: 'linux'},
     {label: 'RPI', value: 'rpi'},
@@ -135,10 +137,10 @@ You need an installed Urho3D library for the desired target platform to proceed.
     {label: 'Windows', value: 'win'},
   ]
   }>
-  <TabItem value="android">
+  <TabItem value={'android'}>
 
 ```bash
-# Scaffolding a new UrhoApp
+# Create a new UrhoApp
 script/dockerized.sh android rake new[AndroidUrhoApp,demo]
 cd demo/AndroidUrhoApp
 # Build the newly generated UrhoApp
@@ -146,58 +148,64 @@ script/dockerized.sh android
 ```
 
   </TabItem>
-  <TabItem value="arm">
+  <TabItem value={'apple'}>
+    <div className={clsx('textBlock', styles.fixedHeight)}>
+      Currently DBE does not support Apple platforms.<br/>
+      However, Urho3D supports Apple platforms using native build environment.
+    </div>
+  </TabItem>
+  <TabItem value={'arm'}>
 
-```bash {4}
-# Scaffolding a new UrhoApp
+```bash
+# Create a new UrhoApp
 script/dockerized.sh arm rake new[ArmUrhoApp,demo]
 cd demo/ArmUrhoApp
-# Build the newly generated UrhoApp, specify other extra build options to target a specific ARM board
-URHO3D_HOME=/home/urho3d/stage-arm/usr/local script/dockerized.sh arm
+# Build the newly generated UrhoApp, substitute '?' accordingly
+ARM_ABI_FLAGS=? script/dockerized.sh arm
 ```
 
   </TabItem>
-  <TabItem value="linux">
+  <TabItem value={'linux'}>
 
 ```bash
-# Scaffolding a new UrhoApp
+# Create a new UrhoApp
 script/dockerized.sh linux rake new[LinuxUrhoApp,demo]
 cd demo/LinuxUrhoApp
 # Build the newly generated UrhoApp
-URHO3D_HOME=/home/urho3d/stage-linux/usr/local script/dockerized.sh linux
+script/dockerized.sh linux
 ```
 
   </TabItem>
-  <TabItem value="rpi">
+  <TabItem value={'rpi'}>
 
-```bash {4}
-# Scaffolding a new UrhoApp
+```bash
+# Create a new UrhoApp
 script/dockerized.sh rpi rake new[PiUrhoApp,demo]
 cd demo/PiUrhoApp
 # Build the newly generated UrhoApp, modify the "RPI_ABI" build option accordingly
-RPI_ABI=RPI4 URHO3D_HOME=/home/urho3d/stage-rpi/usr/local script/dockerized.sh rpi
+RPI_ABI=RPI4 script/dockerized.sh rpi
 ```
 
   </TabItem>
-  <TabItem value="web">
+  <TabItem value={'web'}>
 
 ```bash
-# Scaffolding a new UrhoApp
+# Create a new UrhoApp
 script/dockerized.sh web rake new[WebUrhoApp,demo]
 cd demo/WebUrhoApp
 # Build the newly generated UrhoApp
-URHO3D_HOME=/home/urho3d/stage-web/usr/local script/dockerized.sh web
+script/dockerized.sh web
 ```
 
   </TabItem>
-  <TabItem value="win">
+  <TabItem value={'win'}>
 
 ```bash
-# Scaffolding a new UrhoApp
+# Create a new UrhoApp
 script/dockerized.sh mingw rake new[WindowsUrhoApp,demo]
 cd demo/WindowsUrhoApp
 # Build the newly generated UrhoApp
-URHO3D_HOME=/home/urho3d/stage-mingw/usr/local script/dockerized.sh mingw
+script/dockerized.sh mingw
 ```
 
   </TabItem>
@@ -205,8 +213,42 @@ URHO3D_HOME=/home/urho3d/stage-mingw/usr/local script/dockerized.sh mingw
 
 :::note
 
-This is not a copy/paste error. You can build your new UrhoApp exactly the same way as the Urho3D project itself!
+This is not a copy/paste error. You can build your new UrhoApp exactly the same way as the Urho3D project itself! By default, DBE runs `rake build` command.
 
 :::
 
-The `URHO3D_HOME` build option tells the build system where to find the installed Urho3D library, if the installed location is not a system wide standard location. See the Build Options section for more information.
+You can pass optional build options to the build system by using environment variables. One easy way to do that is to set them just in time on the same line before the actual command to be invoked. For example, `RPI_ABI=RPI4 script/dockerized.sh rpi`. See the Build Options section for more information.
+
+<div className={'text--center'}>
+  <img src={'/img/docs/quick-start-screencast.svg'} alt={'Screencast'}/>
+</div>
+
+## Dockerized Build Environment
+
+Inside the DBE docker container, you can run a single command. By default, the command to run is `rake`. Since the `rakefile` has defined `build` as the default task, effectively making the DBE defaults to perform the build task for the selected target platform. The DBE docker container automatically exits after the single command finished running. The docker container is ephemeral. To make the build artifacts persistent, they must be stored in a bind mount or a docker volume. With bind mount, DBE makes changes to the project root on the host machine after each run, typically in the `build/` directory. While DBE stores the build caches (from ccache and Gradle) and installed libraries (including Urho3D library), in the docker volume.
+
+Following are a few other examples how the DBE docker container can be run. First, set up `dbe` alias for spawning a DBE docker container for, say, Web platform. You can replace it with other target platform.
+
+```bash
+alias dbe='script/dockerized.sh web'
+```
+
+### `dbe env`
+
+Output the preconfigured environment variables for the target platform and exit.
+
+### `dbe ccache -s`
+
+Output the cache statistics from ccache and exit.
+
+### `dbe rake info['install_dir']`
+
+Output the Urho3D default install location for the target platform and exit.
+
+### `dbe ls $(dbe rake info['install_dir'])`
+
+List the current content of the Urho3D default install location for the target platform and exit.
+
+### `dbe bash`
+
+Run an interactive `bash` shell where you can poke around inside the running docker container, execute any commands, including installing more software packages with `sudo` command for quick testing. Changes that are not in bind mount and docker volume will be lost after you type `exit`.

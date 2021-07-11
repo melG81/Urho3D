@@ -22,6 +22,18 @@
 
 task default: :build
 
+desc 'Show info for the specified target platform'
+task :info, [:kind] => [:init] do |_, args|
+  case args[:kind]
+  when 'build_tree'
+    print build_tree
+  when 'install_dir'
+    print install_dir
+  else
+    abort %q{Please specify the type of info requested: 'build_tree', 'install_dir'}
+  end
+end
+
 desc 'Invoke CMake to configure and generate a build tree'
 task :cmake => [:init] do
   if ENV['CI']
@@ -30,7 +42,14 @@ task :cmake => [:init] do
       system 'bash', '-c', 'rm -rf ~/.{ccache,gradle}' or abort 'Failed to clear the build cache'
     end
   end
-  next if ENV['PLATFORM'] == 'android' || (Dir.exist?("#{build_tree}") and not ARGV.include?('cmake'))
+  next if ENV['PLATFORM'] == 'android' || (Dir.exists?(build_tree) and not ARGV.include?('cmake'))
+  ['CMAKE_INSTALL_PREFIX', 'URHO3D_HOME'].each { |var|
+    if ENV[var] == 'system'
+      ENV.delete(var)
+    elsif !ENV[var]
+      ENV[var] = install_dir if var == 'CMAKE_INSTALL_PREFIX' || Dir.exists?(install_dir)
+    end
+  }
   script = "script/cmake_#{ENV['GENERATOR']}#{ENV['OS'] ? '.bat' : '.sh'}"
   build_options = /linux|macOS|win/ =~ ENV['PLATFORM'] ? '' : "-D #{ENV['PLATFORM'].upcase}=1"
   File.readlines('script/.build-options').each { |var|
@@ -99,12 +118,12 @@ task :doc => [:init] do
 end
 
 desc 'Install the software'
-task :install, [:prefix] => [:init] do |_, args|
+task :install, [:dest_dir] => [:init] do |_, args|
   if ENV['PLATFORM'] == 'android'
     Rake::Task[:gradle].invoke('publishToMavenLocal')
     next
   end
-  wrapper = args[:prefix] && !ENV['OS'] ? "DESTDIR=#{verify_path(args[:prefix])}" : ''
+  wrapper = args[:dest_dir] && !ENV['OS'] ? "DESTDIR=#{verify_path(args[:dest_dir], true)}" : ''
   system build_target('install', wrapper) or abort
 end
 
@@ -267,7 +286,15 @@ task :init do
   when /linux/
     $max_jobs = `grep -c processor /proc/cpuinfo`.chomp unless $max_jobs
     ENV['GENERATOR'] = 'generic' unless ENV['GENERATOR']
-    ENV['PLATFORM'] = 'linux' unless ENV['PLATFORM']
+    unless ENV['PLATFORM']
+      if /x86/ =~ `uname -m`
+        ENV['PLATFORM'] = 'linux'
+      elsif Dir.exists?('/opt/vc')
+        ENV['PLATFORM'] = 'rpi'
+      else
+        ENV['PLATFORM'] = 'arm'
+      end
+    end
   when /darwin|macOS/
     $max_jobs = `sysctl -n hw.logicalcpu`.chomp unless $max_jobs
     ENV['GENERATOR'] = 'xcode' unless ENV['GENERATOR']
@@ -320,7 +347,7 @@ def build_host
 end
 
 def build_tree
-  ENV['BUILD_TREE'] || "build/#{dockerized? ? 'dockerized-' : ''}#{ENV['PLATFORM'].downcase}"
+  ENV['BUILD_TREE'] || "build/#{dockerized? ? 'dockerized-' : ''}#{default_path}"
 end
 
 def build_config
@@ -331,21 +358,33 @@ def build_target(tgt, wrapper = '')
   %Q{#{wrapper} cmake --build "#{build_tree}" #{build_config} #{tgt ? "--target #{tgt}" : ''}}
 end
 
-def lint_err_file
-  'build/clang-tidy.out'
-end
-
-def verify_path(path)
-  require 'pathname'
-  begin
-    Pathname.new(File.expand_path(path)).realdirpath.to_s
-  rescue
-    abort "The specified path '#{path}' is invalid!"
-  end
+def default_path
+  "#{ENV['PLATFORM'].downcase}" \
+  "#{ENV['CC'] ? "-#{ENV['CC']}" : ''}" \
+  "#{ENV['GENERATOR'] && ENV['GENERATOR'] != 'generic' ? "-#{ENV['GENERATOR']}" : ''}"
 end
 
 def dockerized?
   File.exists?('/entrypoint.sh')
+end
+
+def install_dir
+  "#{Dir.home}/.urho3d/install/#{default_path}"
+end
+
+def lint_err_file
+  'build/clang-tidy.out'
+end
+
+def verify_path(path, auto_create = false)
+  require 'pathname'
+  begin
+    expanded_path = File.expand_path(path)
+    FileUtils.mkdir_p(expanded_path) if (auto_create && !Dir.exists?(expanded_path))
+    Pathname.new(expanded_path).realdirpath.to_s
+  rescue
+    abort "The specified path '#{path}' is invalid!"
+  end
 end
 
 def first_match(regex, from)
